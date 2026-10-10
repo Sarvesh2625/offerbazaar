@@ -1,0 +1,13 @@
+{
+  "name": "offerbazaar",
+  "version": "1.0.0",
+  "description": "OfferBazaar platform root - orchestrates client and server development",
+  "author": "Sarvesh Mekhe",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
