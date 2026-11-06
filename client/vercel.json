@@ -1,0 +1,17 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "rewrites": [
+        {
+            "source": "/api",
+            "destination": "https://offerbazaar-server.vercel.app/api"
+        },
+        {
+            "source": "/api/:path*",
+            "destination": "https://offerbazaar-server.vercel.app/api/:path*"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
