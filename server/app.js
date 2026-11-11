@@ -103,6 +103,41 @@ app.get('/', (req, res) => {
   });
 });
 
+// TEMPORARY DIAGNOSTIC ROUTE
+app.post('/api/_debug-body', async (req, res) => {
+  const chunks = [];
+  let readError = null;
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve(), 1500);
+      req.on('data', (c) => chunks.push(c));
+      req.on('end', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      req.on('error', (e) => {
+        clearTimeout(timer);
+        reject(e);
+      });
+    });
+  } catch (e) {
+    readError = e.message;
+  }
+
+  return res.json({
+    parsedBody: req.body,
+    bodyType: typeof req.body,
+    rawStreamLength: chunks.reduce((n, c) => n + c.length, 0),
+    rawStream: Buffer.concat(chunks).toString('utf8').slice(0, 400),
+    readError,
+    contentLength: req.headers['content-length'] ?? null,
+    contentType: req.headers['content-type'] ?? null,
+    transferEncoding: req.headers['transfer-encoding'] ?? null,
+    readableEnded: req.readableEnded,
+    headers: req.headers,
+  });
+});
+
 // API Routes
 app.use('/api', routes);
 
