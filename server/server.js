@@ -5,7 +5,13 @@ import { configureCloudinary } from './config/cloudinary.js';
 
 const PORT = process.env.PORT || 5000;
 
-// Initialize Database & Third-Party Services
+/**
+ * Local development / standalone (non-serverless) entry point.
+ *
+ * On Vercel the platform runs `app.js` directly as a single Function and
+ * handles the listen socket itself, so this file is only used when running
+ * the API locally with `npm run dev` or on a traditional Node host.
+ */
 const startServer = async () => {
   try {
     // Initialize Cloudinary

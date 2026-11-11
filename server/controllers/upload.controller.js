@@ -1,7 +1,13 @@
 import { v2 as cloudinary } from 'cloudinary';
 
 /**
- * Generate signed parameters for direct client-side Cloudinary upload
+ * Generate signed parameters for direct client-side Cloudinary upload.
+ *
+ * This is the preferred upload path on serverless platforms: the browser
+ * uploads the file straight to Cloudinary, so the request body never passes
+ * through the function (which would otherwise hit the platform request body
+ * size limit).
+ *
  * POST /api/upload/sign
  */
 export const getUploadSignature = async (req, res, next) => {
@@ -36,6 +42,7 @@ export const getUploadSignature = async (req, res, next) => {
         apiKey,
         cloudName,
         folder,
+        uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
       },
     });
   } catch (error) {
@@ -44,7 +51,13 @@ export const getUploadSignature = async (req, res, next) => {
 };
 
 /**
- * Handle multipart image upload directly via server stream
+ * Handle multipart image upload directly via server stream.
+ *
+ * NOTE: This endpoint proxies the file bytes through the function. On
+ * serverless platforms (Vercel) the platform enforces a request body size
+ * limit, so the client should prefer the signed direct upload above for
+ * anything but very small images.
+ *
  * POST /api/upload
  */
 export const uploadImages = async (req, res, next) => {

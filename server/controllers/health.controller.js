@@ -1,4 +1,4 @@
-import { checkDbConnection } from '../config/db.js';
+import { checkDbConnection, connectDB } from '../config/db.js';
 import { checkCloudinaryConnection } from '../config/cloudinary.js';
 
 /**
@@ -9,6 +9,10 @@ export const getHealth = async (req, res) => {
   try {
     const startTime = Date.now();
 
+    // Best effort connection attempt so a cold-started function reports an
+    // accurate status instead of "disconnected".
+    await connectDB().catch(() => null);
+
     // Check DB and Cloudinary concurrently
     const [dbStatus, cloudinaryStatus] = await Promise.all([
       checkDbConnection(),
@@ -18,9 +22,8 @@ export const getHealth = async (req, res) => {
     const isHealthy =
       dbStatus.status === 'up' && cloudinaryStatus.status === 'up';
 
-    const statusCode = isHealthy ? 200 : 200; // Return 200 with detailed status report
-
-    return res.status(statusCode).json({
+    // Always answer 200 so the platform/probe sees a structured report.
+    return res.status(200).json({
       status: isHealthy ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.floor(process.uptime()),

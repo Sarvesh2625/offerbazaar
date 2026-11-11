@@ -7,13 +7,17 @@ import {
 import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max per image
+  limits: {
+    fileSize: 4 * 1024 * 1024, // 4MB per image (stays under the platform body limit)
+    files: 3,
+  },
 });
 
 // Protect upload endpoints
 router.post('/sign', authenticate, getUploadSignature);
-router.post('/', authenticate, upload.array('images', 5), uploadImages);
+router.post('/', authenticate, upload.array('images', 3), uploadImages);
 
 export default router;
