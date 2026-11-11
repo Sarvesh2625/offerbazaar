@@ -1,20 +1,20 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "framework": "vite",
-    "buildCommand": "npm run build",
-    "outputDirectory": "dist",
-    "rewrites": [
-        {
-            "source": "/api/:path*",
-            "destination": "https://offerbazaar-server.vercel.app/api/:path*"
-        },
-        {
-            "source": "/api",
-            "destination": "https://offerbazaar-server.vercel.app/api"
-        },
-        {
-            "source": "/((?!api/).*)",
-            "destination": "/index.html"
-        }
-    ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://offerbazaar.vercel.app/api/:path*"
+    },
+    {
+      "source": "/api",
+      "destination": "https://offerbazaar.vercel.app/api"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
 }
