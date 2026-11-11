@@ -190,6 +190,86 @@ npm run format     # Format code with Prettier
 
 ---
 
+## 🚀 Deploying to Vercel
+
+The app is split into **two independent Vercel projects** so the API can scale
+on its own while the frontend is served as static assets from the CDN.
+
+| Project | Root Directory | Framework | Production URL |
+| --- | --- | --- | --- |
+| `offerbazaar-server` | `server` | Express | `https://offerbazaar-server.vercel.app` |
+| `offerbazaar` (web) | `client` | Vite | `https://offerbazaar.vercel.app` |
+
+### 1. Deploy the API (`server`)
+
+1. **Create the project** — import the repo, set **Root Directory = `server`**,
+   and set **Framework Preset = Express**. Vercel detects `server/app.js` as the
+   entrypoint and bundles the whole app into a single Function.
+2. **Add environment variables** (Project Settings → Environment Variables):
+
+   ```
+   NODE_ENV=production
+   CLIENT_URL=https://offerbazaar.vercel.app
+   MONGO_URI=mongodb+srv://<user>:<pass>@cluster0.mongodb.net/offerbazaar?retryWrites=true&w=majority
+   JWT_SECRET=<openssl rand -hex 32>
+   JWT_EXPIRES_IN=7d
+   CLOUDINARY_CLOUD_NAME=...
+   CLOUDINARY_API_KEY=...
+   CLOUDINARY_API_SECRET=...
+   VALIDATION_MODE=auto
+   LLM_API_KEY=...
+   LLM_MODEL=gpt-4o-mini
+   COOKIE_SAMESITE=strict
+   ```
+
+3. **Allow Vercel in MongoDB Atlas** — Atlas → Network Access → add
+   `0.0.0.0/0` (or the Vercel egress ranges). Without this every function
+   invocation fails to reach the cluster.
+4. **Seed the database** once, from your machine (not from Vercel):
+   ```bash
+   cd server
+   # .env must contain the production MONGO_URI / ADMIN_* values
+   npm run seed
+   ```
+5. **Deploy.** `GET https://offerbazaar-server.vercel.app/api/health` must
+   return `"status": "healthy"`.
+
+### 2. Deploy the frontend (`client`)
+
+1. Import the repo again, set **Root Directory = `client`**,
+   **Framework Preset = Vite**. No environment variables are needed — the
+   client calls `/api/*` on its own origin.
+2. Update the API host in `client/vercel.json` if your API project has a
+   different name:
+   ```json
+   { "source": "/api/:path*", "destination": "https://<your-api-domain>/api/:path*" }
+   ```
+3. **Deploy.** The Vercel rewrite proxies `/api/*` to the API project, so the
+   browser only ever talks to one origin and the auth cookie stays first-party.
+
+### Production notes
+
+- **Rate limiting** — `app.set('trust proxy', 1)` makes Express read the real
+  client IP from `X-Forwarded-For`. The `x-test-client-ip` header is honoured
+  **only** when `NODE_ENV=test`, so it cannot be used to bypass limits in
+  production.
+- **Database connections** — the Mongoose connection is created lazily and
+  cached on the function instance (`globalThis`), so warm invocations reuse the
+  pool instead of opening a new one on every request. The pool is capped at 5
+  connections per instance.
+- **Image uploads** — the browser uploads directly to Cloudinary using a
+  signature issued by `POST /api/upload/sign`. This keeps file bytes out of
+  the function, avoiding Vercel's 4.5 MB request body limit. The
+  `POST /api/upload` proxy route remains as a fallback for small files.
+- **Request body limit** — Vercel caps request/response bodies at 4.5 MB.
+  `express.json()` is limited to 1 MB and uploads to 4 MB per file.
+- **Function duration** — `maxDuration` is 60 s (set in `server/vercel.json`),
+  enough for the parallel LLM + geocoding + vision validation pipeline.
+- **LLM key** — without `LLM_API_KEY` the text validator cannot run, so every
+  offer is routed to the manual review queue (`flagged_for_review`).
+
+---
+
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE) - Copyright (c) 2026 **Sarvesh Mekhe**.

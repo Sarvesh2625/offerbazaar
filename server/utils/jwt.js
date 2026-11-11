@@ -26,21 +26,42 @@ export const verifyToken = (token) => {
 };
 
 /**
+ * Cookie attributes for the httpOnly auth cookie.
+ *
+ * The frontend reaches the API through the Vercel rewrite proxy, so the
+ * browser only ever talks to its own origin and the cookie is a first-party
+ * cookie. `SameSite=Strict` is therefore correct (and CSRF-safe) for the
+ * single-domain deployment.
+ *
+ * Set `COOKIE_SAMESITE=none` when the API is consumed from a genuinely
+ * cross-site origin (for example a separate API domain called directly from
+ * the browser). `none` requires the `Secure` flag, hence HTTPS.
+ */
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const sameSite = (process.env.COOKIE_SAMESITE || 'strict').toLowerCase();
+
+  const validSameSite = ['strict', 'lax', 'none'];
+  const resolvedSameSite = validSameSite.includes(sameSite)
+    ? sameSite
+    : 'strict';
+
+  return {
+    httpOnly: true,
+    secure: isProduction || resolvedSameSite === 'none',
+    sameSite: resolvedSameSite,
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+  };
+};
+
+/**
  * Set httpOnly auth cookie on HTTP response
  * @param {Object} res - Express response object
  * @param {string} token - Signed JWT
  */
 export const setAuthCookie = (res, token) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-
-  res.cookie('token', token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
-    path: '/',
-    maxAge,
-  });
+  res.cookie('token', token, getCookieOptions());
 };
 
 /**
@@ -48,11 +69,7 @@ export const setAuthCookie = (res, token) => {
  * @param {Object} res - Express response object
  */
 export const clearAuthCookie = (res) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
-    path: '/',
-  });
+  const options = getCookieOptions();
+  delete options.maxAge;
+  res.clearCookie('token', options);
 };

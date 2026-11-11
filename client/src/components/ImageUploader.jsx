@@ -2,7 +2,14 @@ import { useState, useRef } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 
 /**
- * Cloudinary image uploader component
+ * Cloudinary image uploader component.
+ *
+ * Uploads run through a signed direct upload to Cloudinary whenever the
+ * server can issue a signature. This keeps the image bytes out of the API
+ * request, which matters on serverless platforms that cap the request body
+ * size. If signing is unavailable the uploader falls back to the server
+ * proxy endpoint.
+ *
  * @param {Object} props
  * @param {string[]} props.images - Array of Cloudinary URLs
  * @param {function} props.onChange - Callback with updated array of URLs
@@ -19,6 +26,72 @@ export default function ImageUploader({
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
+  /**
+   * Upload a single file directly to Cloudinary using a server-issued signature.
+   * @param {File} file
+   * @returns {Promise<string>} - The secure URL of the uploaded image
+   */
+  const uploadViaSignedRequest = async (file) => {
+    const signRes = await fetch('/api/upload/sign', {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    const signBody = await signRes.json();
+    if (!signRes.ok || !signBody?.data?.uploadUrl) {
+      throw new Error(signBody?.message || 'Could not obtain upload signature');
+    }
+
+    const { timestamp, signature, apiKey, folder, uploadUrl } = signBody.data;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('api_key', apiKey);
+    formData.append('timestamp', String(timestamp));
+    formData.append('signature', signature);
+    formData.append('folder', folder);
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const uploadBody = await uploadRes.json();
+    if (!uploadRes.ok || !uploadBody?.secure_url) {
+      throw new Error(
+        uploadBody?.error?.message || 'Direct image upload failed'
+      );
+    }
+
+    return uploadBody.secure_url;
+  };
+
+  /**
+   * Upload a single file through the API proxy endpoint (fallback path).
+   * @param {File} file
+   * @returns {Promise<string>} - The secure URL of the uploaded image
+   */
+  const uploadViaProxy = async (file) => {
+    const formData = new FormData();
+    formData.append('images', file);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Image upload failed');
+    }
+    if (!data.urls || data.urls.length === 0) {
+      throw new Error('Image upload returned no URL');
+    }
+
+    return data.urls[0];
+  };
+
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -34,24 +107,18 @@ export default function ImageUploader({
     setUploadError(null);
 
     try {
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append('images', file);
-      });
+      const uploaded = [];
 
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Image upload failed');
+      for (const file of files) {
+        try {
+          uploaded.push(await uploadViaSignedRequest(file));
+        } catch {
+          // Fall back to the server proxy if the signed upload is unavailable.
+          uploaded.push(await uploadViaProxy(file));
+        }
       }
 
-      const updated = [...images, ...(data.urls || [])];
-      onChange(updated);
+      onChange([...images, ...uploaded]);
     } catch (err) {
       setUploadError(err.message || 'Failed to upload images');
     } finally {
@@ -80,7 +147,7 @@ export default function ImageUploader({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {images.map((url, idx) => (
           <div
-            key={idx}
+            key={url}
             className="relative group rounded-xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video flex items-center justify-center shadow-md"
           >
             <img
