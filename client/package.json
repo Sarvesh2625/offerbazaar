@@ -5,6 +5,9 @@
   "description": "OfferBazaar Frontend - React, Vite & Tailwind CSS",
   "type": "module",
   "author": "Sarvesh Mekhe",
+  "engines": {
+    "node": "26.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

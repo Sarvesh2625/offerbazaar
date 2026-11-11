@@ -7,7 +7,7 @@
   "author": "Sarvesh Mekhe",
   "license": "MIT",
   "engines": {
-    "node": "20.x"
+    "node": "26.x"
   },
   "scripts": {
     "start": "node server.js",
